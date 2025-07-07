@@ -3,8 +3,9 @@ import pandas as pd
 def preprocess_trip_data(df):
     df = add_company_column(df)
     df = remove_unnecessary_columns(df)
-    df = convert_datetime_columns(df)
+    # df = convert_datetime_columns(df)
     null_value_summary(df)
+    df = add_weekday_column(df)
     return df
 
 def add_company_column(df):
@@ -41,16 +42,88 @@ def convert_datetime_columns(df):
     return df
 
 def null_value_summary(df):
-    # Check which companies have null values in on_scene_datetime
-    print("Null values in 'on_scene_datetime' by company:")
-    on_scene_nulls = df[df['on_scene_datetime'].isnull()]['company'].value_counts()
-    print(on_scene_nulls)
-    print(f"Total null values in on_scene_datetime: {df['on_scene_datetime'].isnull().sum()}")
-    company_data = df[df['company'] == 'Lyft']
-    total_company_rows = len(company_data)
-    on_scene_nulls = company_data['on_scene_datetime'].isnull().sum()
-    on_scene_pct = (on_scene_nulls / total_company_rows * 100).round(2)
-    print(f"Lyft:")
-    print(f"  on_scene_datetime: {on_scene_nulls:,} ({on_scene_pct}%)")
-    print(f"  Total rows: {total_company_rows:,}")
-    print()
+    print("=" * 60)
+    print("NULL VALUE ANALYSIS SUMMARY")
+    print("=" * 60)
+    
+    # Overall null value statistics
+    total_rows = len(df)
+    null_counts = df.isnull().sum()
+    null_percentages = (null_counts / total_rows * 100).round(2)
+    
+    print(f"Total rows in dataset: {total_rows:,}")
+    print("\nNull values by column:")
+    print("-" * 40)
+    
+    for col in df.columns:
+        if null_counts[col] > 0:
+            print(f"{col}: {null_counts[col]:,} ({null_percentages[col]}%)")
+    
+    # Identify rows with any null values
+    rows_with_nulls = df.isnull().any(axis=1)
+    total_rows_with_nulls = rows_with_nulls.sum()
+    
+    print(f"\nRows with at least one null value: {total_rows_with_nulls:,} ({(total_rows_with_nulls/total_rows*100):.2f}%)")
+    
+    # Analyze null patterns by company
+    if 'company' in df.columns:
+        print("\nNull value patterns by company:")
+        print("-" * 40)
+        for company in df['company'].dropna().unique():
+            company_data = df[df['company'] == company]
+            company_rows = len(company_data)
+            
+            print(f"\n{company}:")
+            print(f"  Total rows: {company_rows:,}")
+            
+            for col in df.columns:
+                if col != 'company':
+                    null_count = company_data[col].isnull().sum()
+                    if null_count > 0:
+                        null_pct = (null_count / company_rows * 100)
+                        print(f"  {col}: {null_count:,} ({null_pct:.2f}%)")
+    
+    # Analyze temporal patterns in null values
+    if 'pickup_datetime' in df.columns:
+        print("\nTemporal patterns of null values:")
+        print("-" * 40)
+        
+        # Check if nulls cluster in specific time periods
+        df_with_nulls = df[df.isnull().any(axis=1)]
+        if len(df_with_nulls) > 0 and not df_with_nulls['pickup_datetime'].isnull().all():
+            print(f"Date range of entries with nulls:")
+            print(f"  Earliest: {df_with_nulls['pickup_datetime'].min()}")
+            print(f"  Latest: {df_with_nulls['pickup_datetime'].max()}")
+            
+            # Check if nulls are more common on certain weekdays
+            if 'pickup_weekday' in df.columns:
+                null_by_weekday = df_with_nulls['pickup_weekday'].value_counts()
+                print(f"\nNull entries by weekday:")
+                for day, count in null_by_weekday.items():
+                    total_day_entries = df[df['pickup_weekday'] == day].shape[0]
+                    pct = (count / total_day_entries * 100) if total_day_entries > 0 else 0
+                    print(f"  {day}: {count:,} ({pct:.2f}% of all {day} entries)")
+    
+    # Most common null value combinations
+    print("\nMost common null value patterns:")
+    print("-" * 40)
+    null_patterns = df.isnull().value_counts().head(5)
+    for pattern, count in null_patterns.items():
+        if any(pattern):  # Only show patterns with at least one null
+            null_cols = [df.columns[i] for i, is_null in enumerate(pattern) if is_null]
+            print(f"  Null in {null_cols}: {count:,} rows ({(count/total_rows*100):.2f}%)")
+    
+    print("\n" + "=" * 60)
+
+def add_weekday_column(df):
+    # Add weekday column
+    df['pickup_weekday'] = df['pickup_datetime'].dt.day_name()
+    df['dropoff_weekday'] = df['dropoff_datetime'].dt.day_name()
+    
+    return df
+
+def remove_outliers(df):
+    # Remove outliers based on pickup and dropoff datetime
+    df = df[(df['pickup_datetime'] < df['dropoff_datetime']) & (df['pickup_datetime'] > '2020-01-01')]
+    
+    return df

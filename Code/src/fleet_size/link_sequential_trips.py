@@ -1,16 +1,6 @@
 import pandas as pd
 import numpy as np
-import heapq
-from typing import List, Dict, Tuple
-
-
-def get_travel_time(matrix: pd.DataFrame, from_zone: int, to_zone: int) -> float:
-    """Get travel time between zones from matrix, return inf if not available"""
-    try:
-        return matrix.loc[from_zone, to_zone]
-    except (KeyError, IndexError):
-        return np.inf
-
+from typing import Dict
 
 def calculate_minimum_drivers(trip_data: pd.DataFrame, zone_time_matrix: pd.DataFrame) -> int:
     """
@@ -36,7 +26,7 @@ def calculate_minimum_drivers(trip_data: pd.DataFrame, zone_time_matrix: pd.Data
         for j, (driver_end_time, driver_end_zone) in enumerate(drivers):
             # Calculate time passing between driver end time and trip start
             time_gap = (trip_start - driver_end_time) / np.timedelta64(1, 's')
-            travel_time = get_travel_time(zone_time_matrix, driver_end_zone, trip_start_zone)
+            travel_time = zone_time_matrix.loc[driver_end_zone, trip_start_zone]
             if time_gap >= travel_time:
                 passenger_waiting_time = time_gap - travel_time
                 possible_drivers.append((j, passenger_waiting_time, travel_time))
@@ -106,62 +96,221 @@ def calculate_minimum_drivers_vectorized(trip_data: pd.DataFrame, zone_time_matr
     return driver_count
 
 
-
-def link_sequential_trips(trip_data: pd.DataFrame, zone_time_matrix: pd.DataFrame) -> Dict:
+def calculate_drivers_over_time(trip_data: pd.DataFrame, zone_time_matrix: pd.DataFrame, 
+                              time_interval_minutes: int = 15) -> pd.DataFrame:
     """
-    Main function to link sequential trips and calculate driver requirements.
+    Calculate the minimum number of drivers needed at each time interval throughout the day.
+    
+    Args:
+        trip_data: DataFrame with trip information
+        zone_time_matrix: Matrix with travel times between zones
+        time_interval_minutes: Time interval in minutes for calculating driver requirements
+        
+    Returns:
+        DataFrame with timestamps and corresponding minimum driver counts
+    """
+    trips = trip_data[['pickup_datetime', 'dropoff_datetime', 'PULocationID', 'DOLocationID']].copy()
+    trips = trips.sort_values('pickup_datetime').reset_index(drop=True)
+    
+    # Create time range for the entire day 
+    start_time = trips['pickup_datetime'].min().floor('H')  # Round down to nearest hour
+    end_time = trips['dropoff_datetime'].max().ceil('H')    # Round up to nearest hour
+    
+    time_range = pd.date_range(start=start_time, end=end_time, 
+                              freq=f'{time_interval_minutes}min')
+    
+    driver_counts = []
+    
+    for current_time in time_range:
+        # Get trips that are active at this time point
+        active_trips = trips[
+            (trips['pickup_datetime'] <= current_time) & 
+            (trips['dropoff_datetime'] > current_time)
+        ].copy()
+        
+        if len(active_trips) == 0:
+            driver_counts.append(0)
+            continue
+        
+        # Calculate minimum drivers needed for these active trips
+        # Sort by pickup time to process in chronological order
+        active_trips = active_trips.sort_values('pickup_datetime').reset_index(drop=True)
+        
+        drivers = []  # Each driver: (end_time, end_zone)
+        
+        for _, trip in active_trips.iterrows():
+            trip_start = trip['pickup_datetime']
+            trip_end = trip['dropoff_datetime']
+            trip_start_zone = trip['PULocationID']
+            trip_end_zone = trip['DOLocationID']
+            
+            # Find all possible drivers who could serve this trip
+            possible_drivers = []
+            for j, (driver_end_time, driver_end_zone) in enumerate(drivers):
+                time_gap = (trip_start - driver_end_time) / np.timedelta64(1, 's')
+                travel_time = zone_time_matrix.loc[driver_end_zone, trip_start_zone]
+                if time_gap >= travel_time:
+                    passenger_waiting_time = time_gap - travel_time
+                    possible_drivers.append((j, passenger_waiting_time, travel_time))
+            
+            # Assign the driver who can be there the soonest
+            if possible_drivers:
+                best_driver_idx = min(possible_drivers, key=lambda x: (x[1], x[2]))[0]
+                drivers[best_driver_idx] = (trip_end, trip_end_zone)
+            else:
+                drivers.append((trip_end, trip_end_zone))
+        
+        driver_counts.append(len(drivers))
+    
+    return pd.DataFrame({
+        'timestamp': time_range,
+        'minimum_drivers': driver_counts
+    })
+
+
+def calculate_active_drivers_simple(trip_data: pd.DataFrame, time_interval_minutes: int = 15) -> pd.DataFrame:
+    """
+    Calculate the number of active trips (and thus minimum drivers) at each time interval.
+    This is a simpler approach that doesn't consider driver reuse between trips.
+    
+    Args:
+        trip_data: DataFrame with trip information
+        time_interval_minutes: Time interval in minutes for calculating driver requirements
+        
+    Returns:
+        DataFrame with timestamps and corresponding active trip counts
+    """
+    trips = trip_data[['pickup_datetime', 'dropoff_datetime']].copy()
+    
+    # Create time range for the entire day
+    start_time = trips['pickup_datetime'].min().floor('H')
+    end_time = trips['dropoff_datetime'].max().ceil('H')
+    
+    time_range = pd.date_range(start=start_time, end=end_time, 
+                              freq=f'{time_interval_minutes}min')
+    
+    active_counts = []
+    
+    for current_time in time_range:
+        # Count trips that are active at this time point
+        active_trips_count = len(trips[
+            (trips['pickup_datetime'] <= current_time) & 
+            (trips['dropoff_datetime'] > current_time)
+        ])
+        active_counts.append(active_trips_count)
+    
+    return pd.DataFrame({
+        'timestamp': time_range,
+        'active_trips': active_counts,
+        'minimum_drivers_simple': active_counts  # Each active trip needs one driver
+    })
+
+
+def calculate_minimum_drivers_timeline(trip_data: pd.DataFrame, zone_time_matrix: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate minimum drivers needed over time by tracking when drivers become available.
+    This tracks the actual timeline of driver availability rather than cumulative maximum.
     
     Args:
         trip_data: DataFrame with trip information
         zone_time_matrix: Matrix with travel times between zones
         
     Returns:
-        Dictionary with results including number of drivers and trip chains
+        DataFrame with timeline of driver requirements
     """
-    # Calculate minimum drivers needed
-    num_drivers = calculate_minimum_drivers(trip_data, zone_time_matrix)
+    trips = trip_data[['pickup_datetime', 'dropoff_datetime', 'PULocationID', 'DOLocationID']].copy()
+    trips = trips.sort_values('pickup_datetime').reset_index(drop=True)
     
-    # Build trip chains for analysis
-    trips = trip_data.sort_values('pickup_datetime').reset_index(drop=True)
-    trip_chains = []
-    driver_assignments = {}
+    # Track events: trip starts and driver becomes available
+    events = []
+    drivers_timeline = []  # Will track (timestamp, driver_count)
     
-    # Track drivers with their current state
-    drivers = []
+    # Process trips to build driver timeline
+    drivers = []  # Each driver: (end_time, end_zone)
+    max_drivers = 0
     
-    for trip_idx, trip in trips.iterrows():
+    for i, trip in trips.iterrows():
         trip_start = trip['pickup_datetime']
         trip_end = trip['dropoff_datetime']
         trip_start_zone = trip['PULocationID']
         trip_end_zone = trip['DOLocationID']
         
-        # Find available driver
-        assigned_driver = None
+        # Clean up drivers who could have finished other trips by now
+        current_active_drivers = []
+        for driver_end_time, driver_end_zone in drivers:
+            if driver_end_time > trip_start:  # Driver still busy
+                current_active_drivers.append((driver_end_time, driver_end_zone))
         
-        for driver_id, (driver_end_time, driver_end_zone) in enumerate(drivers):
-            time_gap = (trip_start - driver_end_time).total_seconds()
-            required_travel_time = get_travel_time(zone_time_matrix, driver_end_zone, trip_start_zone)
+        # Find available drivers for this trip
+        possible_drivers = []
+        for j, (driver_end_time, driver_end_zone) in enumerate(current_active_drivers):
+            time_gap = (trip_start - driver_end_time) / np.timedelta64(1, 's')
+            travel_time = zone_time_matrix.loc[driver_end_zone, trip_start_zone]
             
-            if time_gap >= required_travel_time:
-                assigned_driver = driver_id
-                break
+            if time_gap >= travel_time:  # Driver can reach in time
+                passenger_waiting_time = time_gap - travel_time
+                possible_drivers.append((j, passenger_waiting_time, travel_time))
         
-        if assigned_driver is not None:
-            # Assign to existing driver
-            drivers[assigned_driver] = (trip_end, trip_end_zone)
-            trip_chains[assigned_driver].append(trip_idx)
+        if possible_drivers:
+            # Assign existing driver
+            best_driver_idx = min(possible_drivers, key=lambda x: (x[1], x[2]))[0]
+            current_active_drivers[best_driver_idx] = (trip_end, trip_end_zone)
+            drivers = current_active_drivers
         else:
-            # Create new driver
-            driver_id = len(drivers)
-            drivers.append((trip_end, trip_end_zone))
-            trip_chains.append([trip_idx])
-            assigned_driver = driver_id
+            # Need new driver
+            current_active_drivers.append((trip_end, trip_end_zone))
+            drivers = current_active_drivers
         
-        driver_assignments[trip_idx] = assigned_driver
+        # Record driver count at this time
+        current_driver_count = len([d for d in drivers if d[0] > trip_start])
+        drivers_timeline.append((trip_start, current_driver_count))
+        max_drivers = max(max_drivers, current_driver_count)
+        
+        if i % 1000 == 0:
+            print(f"Processed {i+1} trips, max drivers so far: {max_drivers}")
+    
+    # Convert to DataFrame
+    timeline_df = pd.DataFrame(drivers_timeline, columns=['timestamp', 'active_drivers'])
+    timeline_df = timeline_df.drop_duplicates(subset=['timestamp']).sort_values('timestamp')
+    
+    return timeline_df
+
+
+def analyze_driver_requirements_over_time(trip_data: pd.DataFrame, zone_time_matrix: pd.DataFrame) -> Dict:
+    """
+    Comprehensive analysis of driver requirements over time using different methods.
+    
+    Args:
+        trip_data: DataFrame with trip information
+        zone_time_matrix: Matrix with travel times between zones
+        
+    Returns:
+        Dictionary containing different analyses of driver requirements
+    """
+    print("Calculating driver requirements over time...")
+    
+    # Method 1: Simple active trips count (upper bound)
+    print("Method 1: Calculating simple active trips...")
+    simple_timeline = calculate_active_drivers_simple(trip_data, time_interval_minutes=15)
+    
+    # Method 2: Minimum drivers at time intervals considering trip sequencing
+    print("Method 2: Calculating minimum drivers at intervals...")
+    interval_timeline = calculate_drivers_over_time(trip_data, zone_time_matrix, time_interval_minutes=15)
+    
+    # Method 3: Detailed timeline of driver requirements
+    print("Method 3: Calculating detailed driver timeline...")
+    detailed_timeline = calculate_minimum_drivers_timeline(trip_data, zone_time_matrix)
+    
+    # Method 4: Overall minimum (original function for comparison)
+    print("Method 4: Calculating overall minimum drivers...")
+    overall_minimum = calculate_minimum_drivers(trip_data, zone_time_matrix)
     
     return {
-        'num_drivers_needed': num_drivers,
-        'trip_chains': trip_chains,
-        'driver_assignments': driver_assignments,
-        'total_trips': len(trip_data)
+        'simple_timeline': simple_timeline,
+        'interval_timeline': interval_timeline,
+        'detailed_timeline': detailed_timeline,
+        'overall_minimum': overall_minimum,
+        'peak_simple': simple_timeline['active_trips'].max(),
+        'peak_interval': interval_timeline['minimum_drivers'].max(),
+        'peak_detailed': detailed_timeline['active_drivers'].max() if not detailed_timeline.empty else 0
     }

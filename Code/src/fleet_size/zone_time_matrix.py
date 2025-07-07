@@ -88,7 +88,7 @@ def calculate_zone_time_matrix(df):
         print(f"  Connections with data: {len(non_zero_values)} / {len(all_zones)**2}")
     
     # Export to CSV
-    matrix.to_csv('zone_time_matrix.csv')
+    matrix.to_csv('../data/processed/zone_time_matrix.csv')
 
     return matrix
 
@@ -389,33 +389,15 @@ def create_interactive_zone_map(matrix, taxi_zones=None):
     return None
 
 def plausibility_check_zone_time_matrix(matrix, taxi_zones=None):
-    """
-    Comprehensive plausibility check for the zone time matrix.
-    
-    Args:
-        matrix: Zone-to-zone travel time matrix (in seconds)
-        taxi_zones: Optional GeoDataFrame with zone geometries for distance checks
-    
-    Returns:
-        dict: Dictionary with check results and statistics
-    """
     import warnings
     
-    print("🔍 Running Zone Time Matrix Plausibility Checks")
+    print("Running Zone Time Matrix Plausibility Checks")
     print("=" * 50)
     
     results = {}
     issues = []
     
-    # 1. Basic Structure Checks
-    print("\n1. Basic Structure Checks:")
-    print(f"   Matrix shape: {matrix.shape}")
-    print(f"   Expected square matrix: {matrix.shape[0] == matrix.shape[1]}")
-    
-    if matrix.shape[0] != matrix.shape[1]:
-        issues.append("Matrix is not square")
-    
-    # 2. Diagonal Check (same zone travel times)
+    # 1. Diagonal Check (same zone travel times)
     print("\n2. Diagonal Values Check:")
     diagonal_values = np.diag(matrix.values)
     diagonal_minutes = diagonal_values / 60
