@@ -59,7 +59,7 @@ def analyze_active_rides_by_company(df, target_date='2025-02-01'):
     
     return results
 
-def plot_active_trips_over_day(active_rides_by_company, title='Active Trips Over the Day'):
+def plot_active_trips_over_day(active_rides_by_company, title='Active Trips Over the Day', estimated_fleet_size=None):
     """
     Plot active trips over the day for each company.
     """
@@ -68,6 +68,12 @@ def plot_active_trips_over_day(active_rides_by_company, title='Active Trips Over
     plt.figure(figsize=(14, 6))
     for company, rides_df in active_rides_by_company.items():
         plt.plot(rides_df['datetime'], rides_df['active_rides'], label=company)
+    
+    # Add horizontal dotted line for estimated fleet size if provided
+    if estimated_fleet_size is not None:
+        plt.axhline(y=estimated_fleet_size, color='red', linestyle='--', 
+                   label=f'Estimated Fleet Size: {estimated_fleet_size}', alpha=0.8)
+    
     plt.title(title)
     plt.xlabel('Time')
     plt.ylabel('Number of Active Trips')

@@ -3,8 +3,8 @@ import pandas as pd
 def preprocess_trip_data(df):
     df = add_company_column(df)
     df = remove_unnecessary_columns(df)
-    # df = convert_datetime_columns(df)
-    null_value_summary(df)
+    df = convert_datetime_columns(df)
+    # null_value_summary(df)
     df = add_weekday_column(df)
     return df
 

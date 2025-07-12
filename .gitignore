@@ -1,1 +1,6 @@
 __pycache__/
+Code/data/raw/fhvhv_tripdata_2025-02.parquet
+Code/data/raw/taxi_zones/*
+Code/data/raw/data_reports_monthly.csv
+
+
