@@ -203,3 +203,63 @@ def create_fleet_size_summary_table(trip_data: pd.DataFrame, zone_time_matrix: p
         print(f"Finished processing {date}.")
 
     return pd.DataFrame(results)
+
+
+def create_fleet_size_summary_table_improved(trip_data: pd.DataFrame, zone_time_matrix: pd.DataFrame) -> pd.DataFrame:
+    # Ensure datetime columns are properly formatted
+    trip_data = trip_data.copy()
+    trip_data['date'] = trip_data['pickup_datetime'].dt.date
+    trip_data['time'] = trip_data['pickup_datetime'].dt.time
+    
+    # Get unique dates
+    unique_dates = sorted(trip_data['date'].unique())
+    
+    results = []
+    
+    for date in unique_dates:
+        print(f"Processing {date}...")
+        
+        # Filter trips for this date
+        daily_trips = trip_data[trip_data['date'] == date].copy()
+        
+        if len(daily_trips) == 0:
+            continue
+            
+        # Full day fleet size
+        fleet_size_full_day = calculate_minimum_drivers_improved(daily_trips, zone_time_matrix)
+        
+        # Peak Morning: 07:00:00 until 10:00:00
+        morning_trips = daily_trips[
+            (daily_trips['pickup_datetime'].dt.time >= pd.to_datetime('07:00:00').time()) &
+            (daily_trips['pickup_datetime'].dt.time < pd.to_datetime('10:00:00').time())
+        ]
+        fleet_size_peak_morning = calculate_minimum_drivers_improved(morning_trips, zone_time_matrix) if len(morning_trips) > 0 else 0
+        
+        # Peak Evening: 17:00:00 until 20:00:00
+        evening_trips = daily_trips[
+            (daily_trips['pickup_datetime'].dt.time >= pd.to_datetime('17:00:00').time()) &
+            (daily_trips['pickup_datetime'].dt.time < pd.to_datetime('20:00:00').time())
+        ]
+        fleet_size_peak_evening = calculate_minimum_drivers_improved(evening_trips, zone_time_matrix) if len(evening_trips) > 0 else 0
+        
+        # Off-Peak: 10:00:00 until 17:00:00
+        off_peak_trips = daily_trips[
+            (daily_trips['pickup_datetime'].dt.time >= pd.to_datetime('10:00:00').time()) &
+            (daily_trips['pickup_datetime'].dt.time < pd.to_datetime('17:00:00').time())
+        ]
+        fleet_size_off_peak = calculate_minimum_drivers_improved(off_peak_trips, zone_time_matrix) if len(off_peak_trips) > 0 else 0
+        
+        # Get weekday
+        weekday = pd.to_datetime(date).strftime('%A')
+        
+        results.append({
+            'date': date,
+            'Fleet_Size_Full_Day': fleet_size_full_day,
+            'Fleet_Size_Peak_Morning': fleet_size_peak_morning,
+            'Fleet_Size_Peak_Evening': fleet_size_peak_evening,
+            'Fleet_Size_Off_Peak': fleet_size_off_peak,
+            'weekday': weekday
+        })
+        print(f"Finished processing {date}.")
+
+    return pd.DataFrame(results)

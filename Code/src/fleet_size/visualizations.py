@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-def visualize_fleet_size_trends(df):
+def visualize_fleet_size_trends(df, company=None):
     """
     Visualize fleet size trends over time for all time periods using bar charts.
     """
@@ -28,7 +28,7 @@ def visualize_fleet_size_trends(df):
     
     ax.set_xlabel('Date (MM-DD) and Weekday', fontsize=12)
     ax.set_ylabel('Fleet Size (Number of Drivers)', fontsize=12)
-    ax.set_title('Fleet Size Requirements Over Time - February 2025', fontsize=14, fontweight='bold')
+    ax.set_title(f'{company} - Fleet Size Requirements Over Time - February 2025', fontsize=14, fontweight='bold')
     ax.grid(True, alpha=0.3, axis='y')
     
     # Set x-axis labels
@@ -44,7 +44,7 @@ def visualize_fleet_size_trends(df):
     plt.tight_layout()
     plt.show()
 
-def visualize_time_period_comparison(df):
+def visualize_time_period_comparison(df, company=None):
     """
     Compare average fleet sizes across different time periods using combined bar and box plots.
     """
@@ -82,7 +82,7 @@ def visualize_time_period_comparison(df):
                    label='Weekends', color=colors[1], alpha=0.8, edgecolor='black', linewidth=1)
     
     ax1.set_ylabel('Average Fleet Size', fontsize=12)
-    ax1.set_title('Average Fleet Size by Time Period - Weekdays vs Weekends', fontsize=13, fontweight='bold')
+    ax1.set_title(f'{company} - Average Fleet Size by Time Period - Weekdays vs Weekends', fontsize=13, fontweight='bold')
     ax1.set_xticks(x)
     ax1.set_xticklabels(periods)
     ax1.legend()
@@ -127,7 +127,7 @@ def visualize_time_period_comparison(df):
         patch.set_alpha(0.8)
     
     ax2.set_ylabel('Fleet Size Distribution', fontsize=12)
-    ax2.set_title('Fleet Size Distribution by Time Period - Weekdays vs Weekends', fontsize=13, fontweight='bold')
+    ax2.set_title(f'{company} - Fleet Size Distribution by Time Period - Weekdays vs Weekends', fontsize=13, fontweight='bold')
     ax2.set_xticks([1.25, 3.25, 5.25])
     ax2.set_xticklabels(periods)
     ax2.grid(True, alpha=0.3, axis='y')
@@ -147,7 +147,7 @@ def visualize_time_period_comparison(df):
     plt.tight_layout()
     plt.show()
 
-def visualize_weekday_patterns(df):
+def visualize_weekday_patterns(df, company=None):
     """
     Analyze and visualize weekday vs weekend patterns in fleet size requirements.
     """
@@ -237,16 +237,16 @@ def visualize_weekday_patterns(df):
     plt.tight_layout()
     plt.show()
 
-def visualize_fleet_size_summary(df):
+def visualize_fleet_size_summary(df, company=None):
     """
     Main function that calls all visualization functions.
     """
     print("Generating fleet size visualizations...")
     print("1. Fleet Size Trends Over Time")
-    visualize_fleet_size_trends(df)
+    visualize_fleet_size_trends(df, company)
 
     print("2. Weekday Time Period Comparison")
-    visualize_time_period_comparison(df)
+    visualize_time_period_comparison(df, company)
 
     print("3. Weekday Patterns Analysis")
-    visualize_weekday_patterns(df)
+    visualize_weekday_patterns(df, company)
