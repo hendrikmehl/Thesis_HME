@@ -87,11 +87,6 @@ def visualize_fleet_size_share_stacked(uber_df, lyft_df, time_period='Fleet_Size
     avg_uber = merged_df['uber_percentage'].mean()
     avg_lyft = merged_df['lyft_percentage'].mean()
     
-    textstr = f'Average Fleet Size Share:\nUber: {avg_uber:.1f}%\nLyft: {avg_lyft:.1f}%'
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
-            verticalalignment='top', bbox=props)
-    
     plt.tight_layout()
     plt.show()
     
@@ -322,11 +317,6 @@ def visualize_fleet_size_share_by_weekday(uber_df, lyft_df):
     # Add summary statistics box
     avg_uber = np.mean(uber_percentages)
     avg_lyft = np.mean(lyft_percentages)
-    
-    textstr = f'Weekly Average:\nUber: {avg_uber:.1f}%\nLyft: {avg_lyft:.1f}%'
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    ax.text(0.02, 0.98, textstr, transform=ax.transAxes, fontsize=10,
-            verticalalignment='top', bbox=props)
     
     plt.tight_layout()
     plt.show()
