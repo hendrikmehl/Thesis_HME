@@ -216,113 +216,170 @@ def visualize_fleet_size_share_time_periods(uber_df, lyft_df):
                     f'{lyft_pct:.1f}%', ha='center', va='center', 
                     fontweight='bold', fontsize=12, color='white')
     
-    plt.tight_layout()
-    plt.show()
-    
-    # Print summary statistics
-    print("\n=== Fleet Size Share Analysis by Time Period ===")
-    print("\nWeekdays:")
-    for i, period in enumerate(['Peak Morning', 'Off-Peak', 'Peak Evening']):
-        print(f"{period}: Uber {uber_values_wd[i]:.1f}%, Lyft {lyft_values_wd[i]:.1f}%")
-    
-    print("\nWeekends:")
-    for i, period in enumerate(['Peak Morning', 'Off-Peak', 'Peak Evening']):
-        print(f"{period}: Uber {uber_values_we[i]:.1f}%, Lyft {lyft_values_we[i]:.1f}%")
-
-
-def visualize_fleet_size_share_by_weekday(uber_df, lyft_df):
-    """
-    Visualize average fleet size share for each day of the week for full day only.
-    """
-    fig, ax = plt.subplots(figsize=(12, 8))
-    
-    # Prepare data
-    uber_df = uber_df.copy()
-    lyft_df = lyft_df.copy()
-    uber_df['date'] = pd.to_datetime(uber_df['date'])
-    lyft_df['date'] = pd.to_datetime(lyft_df['date'])
-    
-    # Merge dataframes
-    merged_df = pd.merge(uber_df[['date', 'Fleet_Size_Full_Day', 'weekday']], 
-                        lyft_df[['date', 'Fleet_Size_Full_Day']], 
-                        on='date', 
-                        suffixes=('_uber', '_lyft'))
-    
-    # Define day order
+    # --- Right subplot: Fleet size share by day of week (full day) ---
+    ax = axes[1]
+    uber_df_ = uber_df.copy()
+    lyft_df_ = lyft_df.copy()
+    uber_df_['date'] = pd.to_datetime(uber_df_['date'])
+    lyft_df_['date'] = pd.to_datetime(lyft_df_['date'])
+    merged_df = pd.merge(
+        uber_df_[['date', 'Fleet_Size_Full_Day', 'weekday']],
+        lyft_df_[['date', 'Fleet_Size_Full_Day']],
+        on='date',
+        suffixes=('_uber', '_lyft')
+    )
     day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    
-    # Calculate daily averages and market share
     daily_data = []
-    
     for day in day_order:
         day_data = merged_df[merged_df['weekday'] == day]
         if len(day_data) > 0:
             avg_uber = day_data['Fleet_Size_Full_Day_uber'].mean()
             avg_lyft = day_data['Fleet_Size_Full_Day_lyft'].mean()
             total = avg_uber + avg_lyft
-            
             uber_pct = (avg_uber / total) * 100 if total > 0 else 0
             lyft_pct = (avg_lyft / total) * 100 if total > 0 else 0
-            
-            daily_data.append({
-                'day': day,
-                'uber_pct': uber_pct,
-                'lyft_pct': lyft_pct
-            })
-    
-    # Extract data for plotting
+            daily_data.append({'day': day, 'uber_pct': uber_pct, 'lyft_pct': lyft_pct})
     days = [d['day'] for d in daily_data]
     uber_percentages = [d['uber_pct'] for d in daily_data]
     lyft_percentages = [d['lyft_pct'] for d in daily_data]
-    
-    # Create stacked bar chart
     x = np.arange(len(days))
-    
-    # Define colors for weekdays and weekends
     uber_colors = ['#216695' if day in ['Saturday', 'Sunday'] else '#3498db' for day in days]
     lyft_colors = ['#912b20' if day in ['Saturday', 'Sunday'] else '#e74c3c' for day in days]
-    
-    bars1 = ax.bar(x, uber_percentages, label='Uber', color=uber_colors, alpha=0.8, 
-                  edgecolor='black', linewidth=0.5)
-    bars2 = ax.bar(x, lyft_percentages, bottom=uber_percentages, label='Lyft', 
-                  color=lyft_colors, alpha=0.8, edgecolor='black', linewidth=0.5)
-    
-    # Customize plot
+    bars1 = ax.bar(x, uber_percentages, label='Uber', color=uber_colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+    bars2 = ax.bar(x, lyft_percentages, bottom=uber_percentages, label='Lyft', color=lyft_colors, alpha=0.8, edgecolor='black', linewidth=0.5)
     ax.set_ylabel('Fleet Size Share (%)', fontsize=12)
     ax.set_xlabel('Day of Week', fontsize=12)
-    ax.set_title('Uber vs Lyft Fleet Size Share by Day of Week - Full Day - February 2025', 
-                fontsize=14, fontweight='bold')
+    ax.set_title('Fleet Size Share by Day of Week\nFull Day', fontsize=14, fontweight='bold')
     ax.set_xticks(x)
     ax.set_xticklabels(days, fontsize=11)
     ax.set_ylim(0, 100)
     ax.grid(True, alpha=0.3, axis='y')
     ax.legend(loc='upper right', fontsize=11)
-    
-    # Add percentage labels
     for i, (bar1, bar2) in enumerate(zip(bars1, bars2)):
-        # Uber percentage
         uber_pct = uber_percentages[i]
-        if uber_pct > 5:
-            ax.text(bar1.get_x() + bar1.get_width()/2., uber_pct/2,
-                   f'{uber_pct:.1f}%', ha='center', va='center', 
-                   fontweight='bold', fontsize=10, color='white')
-        
-        # Lyft percentage
         lyft_pct = lyft_percentages[i]
+        if uber_pct > 5:
+            ax.text(bar1.get_x() + bar1.get_width()/2., uber_pct/2, f'{uber_pct:.1f}%', ha='center', va='center', fontweight='bold', fontsize=10, color='white')
         if lyft_pct > 5:
-            ax.text(bar2.get_x() + bar2.get_width()/2., uber_pct + lyft_pct/2,
-                   f'{lyft_pct:.1f}%', ha='center', va='center', 
-                   fontweight='bold', fontsize=10, color='white')
-    
-    # Add summary statistics box
-    avg_uber = np.mean(uber_percentages)
-    avg_lyft = np.mean(lyft_percentages)
+            ax.text(bar2.get_x() + bar2.get_width()/2., uber_pct + lyft_pct/2, f'{lyft_pct:.1f}%', ha='center', va='center', fontweight='bold', fontsize=10, color='white')
     
     plt.tight_layout()
     plt.show()
+
+def visualize_fleet_size_share_combined(uber_df, lyft_df):
+    """
+    Create a shared plot with two subplots:
+    - Left: Fleet size share by time period (weekdays vs weekends)
+    - Right: Fleet size share by day of week (full day)
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(22, 8))
     
-    # Print summary statistics
-    print("\n=== Fleet Size Share Analysis by Day of Week - Full Day ===")
-    for i, day in enumerate(days):
-        print(f"{day}: Uber {uber_percentages[i]:.1f}%, Lyft {lyft_percentages[i]:.1f}%")
-    print(f"\nWeekly Average: Uber {avg_uber:.1f}%, Lyft {avg_lyft:.1f}%")
+    # --- Left subplot: Fleet size share by time period (weekdays vs weekends) ---
+    ax = axes[0]
+    # Prepare data
+    uber_df_ = uber_df.copy()
+    lyft_df_ = lyft_df.copy()
+    uber_df_['date'] = pd.to_datetime(uber_df_['date'])
+    lyft_df_['date'] = pd.to_datetime(lyft_df_['date'])
+    merged_df = pd.merge(
+        uber_df_[['date', 'Fleet_Size_Peak_Morning', 'Fleet_Size_Off_Peak', 'Fleet_Size_Peak_Evening', 'weekday']],
+        lyft_df_[['date', 'Fleet_Size_Peak_Morning', 'Fleet_Size_Off_Peak', 'Fleet_Size_Peak_Evening']],
+        on='date',
+        suffixes=('_uber', '_lyft')
+    )
+    weekday_mask = ~merged_df['weekday'].isin(['Saturday', 'Sunday'])
+    df_weekdays = merged_df[weekday_mask]
+    df_weekend = merged_df[~weekday_mask]
+    weekday_uber_pct, weekday_lyft_pct, weekend_uber_pct, weekend_lyft_pct = {}, {}, {}, {}
+    for period in ['Peak_Morning', 'Off_Peak', 'Peak_Evening']:
+        uber_col = f'Fleet_Size_{period}_uber'
+        lyft_col = f'Fleet_Size_{period}_lyft'
+        total_wd = df_weekdays[uber_col].mean() + df_weekdays[lyft_col].mean()
+        total_we = df_weekend[uber_col].mean() + df_weekend[lyft_col].mean()
+        weekday_uber_pct[period] = (df_weekdays[uber_col].mean() / total_wd) * 100 if total_wd > 0 else 0
+        weekday_lyft_pct[period] = (df_weekdays[lyft_col].mean() / total_wd) * 100 if total_wd > 0 else 0
+        weekend_uber_pct[period] = (df_weekend[uber_col].mean() / total_we) * 100 if total_we > 0 else 0
+        weekend_lyft_pct[period] = (df_weekend[lyft_col].mean() / total_we) * 100 if total_we > 0 else 0
+    periods = ['Peak Morning', 'Off-Peak', 'Peak Evening']
+    x = np.arange(len(periods))
+    width = 0.35
+    uber_values_wd = [weekday_uber_pct['Peak_Morning'], weekday_uber_pct['Off_Peak'], weekday_uber_pct['Peak_Evening']]
+    lyft_values_wd = [weekday_lyft_pct['Peak_Morning'], weekday_lyft_pct['Off_Peak'], weekday_lyft_pct['Peak_Evening']]
+    uber_values_we = [weekend_uber_pct['Peak_Morning'], weekend_uber_pct['Off_Peak'], weekend_uber_pct['Peak_Evening']]
+    lyft_values_we = [weekend_lyft_pct['Peak_Morning'], weekend_lyft_pct['Off_Peak'], weekend_lyft_pct['Peak_Evening']]
+    bars1_wd = ax.bar(x - width/2, uber_values_wd, width, label='Uber (Weekdays)', color='#3498db', alpha=0.8, edgecolor='black', linewidth=0.5)
+    bars2_wd = ax.bar(x - width/2, lyft_values_wd, width, bottom=uber_values_wd, label='Lyft (Weekdays)', color='#e74c3c', alpha=0.8, edgecolor='black', linewidth=0.5)
+    bars1_we = ax.bar(x + width/2, uber_values_we, width, label='Uber (Weekends)', color='#216695', alpha=0.8, edgecolor='black', linewidth=0.5)
+    bars2_we = ax.bar(x + width/2, lyft_values_we, width, bottom=uber_values_we, label='Lyft (Weekends)', color='#912b20', alpha=0.8, edgecolor='black', linewidth=0.5)
+    ax.set_ylabel('Fleet Size Share (%)', fontsize=12)
+    ax.set_title('Fleet Size Share by Time Period\nWeekdays vs Weekends', fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(periods)
+    ax.set_ylim(0, 100)
+    ax.legend(loc='upper right', fontsize=10)
+    ax.grid(True, alpha=0.3, axis='y')
+    # Add percentage labels
+    for i, (bar1, bar2) in enumerate(zip(bars1_wd, bars2_wd)):
+        uber_pct = uber_values_wd[i]
+        lyft_pct = lyft_values_wd[i]
+        if uber_pct > 5:
+            ax.text(bar1.get_x() + bar1.get_width()/2., uber_pct/2, f'{uber_pct:.1f}%', ha='center', va='center', fontweight='bold', fontsize=12, color='white')
+        if lyft_pct > 5:
+            ax.text(bar2.get_x() + bar2.get_width()/2., uber_pct + lyft_pct/2, f'{lyft_pct:.1f}%', ha='center', va='center', fontweight='bold', fontsize=12, color='white')
+    for i, (bar1, bar2) in enumerate(zip(bars1_we, bars2_we)):
+        uber_pct = uber_values_we[i]
+        lyft_pct = lyft_values_we[i]
+        if uber_pct > 5:
+            ax.text(bar1.get_x() + bar1.get_width()/2., uber_pct/2, f'{uber_pct:.1f}%', ha='center', va='center', fontweight='bold', fontsize=12, color='white')
+        if lyft_pct > 5:
+            ax.text(bar2.get_x() + bar2.get_width()/2., uber_pct + lyft_pct/2, f'{lyft_pct:.1f}%', ha='center', va='center', fontweight='bold', fontsize=12, color='white')
+    
+    # --- Right subplot: Fleet size share by day of week (full day) ---
+    ax = axes[1]
+    uber_df_ = uber_df.copy()
+    lyft_df_ = lyft_df.copy()
+    uber_df_['date'] = pd.to_datetime(uber_df_['date'])
+    lyft_df_['date'] = pd.to_datetime(lyft_df_['date'])
+    merged_df = pd.merge(
+        uber_df_[['date', 'Fleet_Size_Full_Day', 'weekday']],
+        lyft_df_[['date', 'Fleet_Size_Full_Day']],
+        on='date',
+        suffixes=('_uber', '_lyft')
+    )
+    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    daily_data = []
+    for day in day_order:
+        day_data = merged_df[merged_df['weekday'] == day]
+        if len(day_data) > 0:
+            avg_uber = day_data['Fleet_Size_Full_Day_uber'].mean()
+            avg_lyft = day_data['Fleet_Size_Full_Day_lyft'].mean()
+            total = avg_uber + avg_lyft
+            uber_pct = (avg_uber / total) * 100 if total > 0 else 0
+            lyft_pct = (avg_lyft / total) * 100 if total > 0 else 0
+            daily_data.append({'day': day, 'uber_pct': uber_pct, 'lyft_pct': lyft_pct})
+    days = [d['day'] for d in daily_data]
+    uber_percentages = [d['uber_pct'] for d in daily_data]
+    lyft_percentages = [d['lyft_pct'] for d in daily_data]
+    x = np.arange(len(days))
+    uber_colors = ['#216695' if day in ['Saturday', 'Sunday'] else '#3498db' for day in days]
+    lyft_colors = ['#912b20' if day in ['Saturday', 'Sunday'] else '#e74c3c' for day in days]
+    bars1 = ax.bar(x, uber_percentages, label='Uber', color=uber_colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+    bars2 = ax.bar(x, lyft_percentages, bottom=uber_percentages, label='Lyft', color=lyft_colors, alpha=0.8, edgecolor='black', linewidth=0.5)
+    ax.set_ylabel('Fleet Size Share (%)', fontsize=12)
+    ax.set_xlabel('Day of Week', fontsize=12)
+    ax.set_title('Fleet Size Share by Day of Week\nFull Day', fontsize=14, fontweight='bold')
+    ax.set_xticks(x)
+    ax.set_xticklabels(days, fontsize=11)
+    ax.set_ylim(0, 100)
+    ax.grid(True, alpha=0.3, axis='y')
+    ax.legend(loc='upper right', fontsize=11)
+    for i, (bar1, bar2) in enumerate(zip(bars1, bars2)):
+        uber_pct = uber_percentages[i]
+        lyft_pct = lyft_percentages[i]
+        if uber_pct > 5:
+            ax.text(bar1.get_x() + bar1.get_width()/2., uber_pct/2, f'{uber_pct:.1f}%', ha='center', va='center', fontweight='bold', fontsize=10, color='white')
+        if lyft_pct > 5:
+            ax.text(bar2.get_x() + bar2.get_width()/2., uber_pct + lyft_pct/2, f'{lyft_pct:.1f}%', ha='center', va='center', fontweight='bold', fontsize=10, color='white')
+    
+    plt.tight_layout()
+    plt.show()
