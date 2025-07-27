@@ -92,6 +92,7 @@ def calculate_minimum_drivers_vectorized(trip_data: pd.DataFrame, zone_time_matr
     
     return driver_count
 
+# --- Not included in the thesis, just tested with other approaches ---
 def calculate_minimum_drivers_improved(trip_data: pd.DataFrame, zone_time_matrix: pd.DataFrame) -> int:
     trips = trip_data[['pickup_datetime', 'dropoff_datetime', 'PULocationID', 'DOLocationID']].copy()
     trips = trips.sort_values('pickup_datetime').reset_index(drop=True)
@@ -203,7 +204,6 @@ def create_fleet_size_summary_table(trip_data: pd.DataFrame, zone_time_matrix: p
         print(f"Finished processing {date}.")
 
     return pd.DataFrame(results)
-
 
 def create_fleet_size_summary_table_improved(trip_data: pd.DataFrame, zone_time_matrix: pd.DataFrame) -> pd.DataFrame:
     # Ensure datetime columns are properly formatted
