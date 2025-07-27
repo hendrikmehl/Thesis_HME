@@ -110,6 +110,16 @@ def plot_active_trips_by_weekday(df, company=None):
     # Weekday names
     weekday_names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
     
+    # Calculate global max for consistent y-axis
+    global_max = 0
+    for weekday in range(7):
+        dates_for_weekday = weekday_dates[weekday]
+        for date in dates_for_weekday:
+            date_str = date.strftime('%Y-%m-%d')
+            active_rides_df = calculate_active_rides_per_minute(df, target_date=date_str)
+            daily_max = active_rides_df['active_rides'].max()
+            global_max = max(global_max, daily_max)
+    
     # Create subplots
     fig, axes = plt.subplots(2, 4, figsize=(20, 10))
     axes = axes.flatten()
@@ -120,6 +130,7 @@ def plot_active_trips_by_weekday(df, company=None):
         
         if not dates_for_weekday:
             ax.set_title(f'{weekday_names[weekday]} - No data')
+            ax.set_ylim(0, global_max * 1.05)  # Set consistent y-axis even for no data
             continue
         
         for date in dates_for_weekday:
@@ -138,6 +149,7 @@ def plot_active_trips_by_weekday(df, company=None):
         ax.set_xlabel('Hour of Day')
         ax.set_ylabel('Active Rides')
         ax.set_xlim(0, 24)
+        ax.set_ylim(0, global_max * 1.05)  # Set consistent y-axis limits
         ax.grid(True, alpha=0.3)
         
         # Add legend if there are multiple dates
